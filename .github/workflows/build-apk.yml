@@ -75,10 +75,12 @@ jobs:
           }
           EOF
 
-      - name: Remove Legacy Compose Compiler Flags
+      - name: Strip Incompatible Legacy Compose Compiler References
         run: |
-          find . -name "*.gradle.kts" -type f -exec sed -i '/kotlinCompilerExtensionVersion/d' {} +
-          find . -name "*.gradle" -type f -exec sed -i '/kotlinCompilerExtensionVersion/d' {} +
+          # Completely scrub any legacy androidx.compose.compiler references and compiler extensions 
+          # across all build files and version catalogs to prevent version mismatches with Kotlin
+          find . \( -name "*.gradle" -o -name "*.gradle.kts" -o -name "libs.versions.toml" \) -type f -exec sed -i '/androidx\.compose\.compiler/d' {} +
+          find . \( -name "*.gradle" -o -name "*.gradle.kts" \) -type f -exec sed -i '/kotlinCompilerExtensionVersion/d' {} +
 
       - name: Ensure Gradle wrapper executable
         run: |
@@ -90,7 +92,6 @@ jobs:
       - name: Configure Gradle Properties (Global Headless & Memory)
         run: |
           mkdir -p ~/.gradle
-          # Inject headless mode into jvmargs so all KSP worker processes inherit it
           echo "org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8 -Djava.awt.headless=true" >> ~/.gradle/gradle.properties
           echo "org.gradle.parallel=true" >> ~/.gradle/gradle.properties
           echo "ksp.incremental=false" >> ~/.gradle/gradle.properties
