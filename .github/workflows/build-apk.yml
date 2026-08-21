@@ -50,7 +50,7 @@ jobs:
           chmod +x gradlew
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: ./gradlew assembleDebug --stacktrace --no-daemon -Djava.awt.headless=true -Pksp.incremental=false
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
