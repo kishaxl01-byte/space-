@@ -42,16 +42,32 @@ jobs:
               -dname "CN=Android Debug,O=Android,C=US"
           fi
 
-      - name: Generate Mock google-services.json
+      - name: Generate Mock google-services.json (Dynamic App ID)
         run: |
           mkdir -p app
+          
+          # Dynamically extract the actual applicationId from Gradle or Manifest files
+          APP_ID=$(grep -h -o -P 'applicationId\s*=?\s*["'\'']\K[^"'\'']+' app/build.gradle.kts app/build.gradle 2>/dev/null | head -n 1)
+          
+          if [ -z "$APP_ID" ]; then
+            APP_ID=$(grep -h -o -P 'package=["'\'']\K[^"'\'']+' app/src/main/AndroidManifest.xml 2>/dev/null | head -n 1)
+          fi
+          
+          if [ -z "$APP_ID" ]; then
+            echo "Could not find applicationId. Defaulting to com.example.app"
+            APP_ID="com.example.app"
+          else
+            echo "Found matching applicationId: $APP_ID"
+          fi
+          
+          # Create the valid mock JSON using the detected application ID
           cat <<EOF > app/google-services.json
           {
             "project_info": { "project_number": "123456789", "project_id": "dummy-ci-project" },
             "client": [{
               "client_info": {
                 "mobilesdk_app_id": "1:123456789:android:abcdef123456",
-                "android_client_info": { "package_name": "com.dummy.app" }
+                "android_client_info": { "package_name": "$APP_ID" }
               },
               "api_key": [{ "current_key": "dummy-api-key" }]
             }],
@@ -61,9 +77,6 @@ jobs:
 
       - name: Remove Legacy Compose Compiler Flags
         run: |
-          # The previous AbstractMethodError was caused by lingering 'kotlinCompilerExtensionVersion' 
-          # configs conflicting with the modern Kotlin Compose plugin already present in the project.
-          # Safely removing these legacy flags resolves the mismatch without duplicating plugin requests.
           find . -name "*.gradle.kts" -type f -exec sed -i '/kotlinCompilerExtensionVersion/d' {} +
           find . -name "*.gradle" -type f -exec sed -i '/kotlinCompilerExtensionVersion/d' {} +
 
