@@ -75,11 +75,26 @@ jobs:
           }
           EOF
 
-      - name: Strip Incompatible Legacy Compose Compiler References
+      - name: Align Compose Compiler with Kotlin Version
         run: |
-          # Completely scrub any legacy androidx.compose.compiler references and compiler extensions 
-          # across all build files and version catalogs to prevent version mismatches with Kotlin
-          find . \( -name "*.gradle" -o -name "*.gradle.kts" -o -name "libs.versions.toml" \) -type f -exec sed -i '/androidx\.compose\.compiler/d' {} +
+          # 1. Dynamically extract Kotlin version from libs.versions.toml or build files
+          KOTLIN_VER=""
+          if [ -f gradle/libs.versions.toml ]; then
+            KOTLIN_VER=$(grep -E '^\s*kotlin\s*=\s*"' gradle/libs.versions.toml | sed -E 's/.*"([^"]+)".*/\1/')
+          fi
+          if [ -z "$KOTLIN_VER" ]; then
+            KOTLIN_VER="2.0.21" # Fallback default
+          fi
+          
+          echo "Detected Kotlin Version: $KOTLIN_VER"
+          
+          # 2. Automatically sync compose-compiler version to match Kotlin version in version catalog
+          if [ -f gradle/libs.versions.toml ]; then
+            sed -i -E "s/(compose-compiler\s*=\s*)\"[^\"]+\"/\\1\"$KOTLIN_VER\"/g" gradle/libs.versions.toml
+            sed -i -E "s/(composeCompiler\s*=\s*)\"[^\"]+\"/\\1\"$KOTLIN_VER\"/g" gradle/libs.versions.toml
+          fi
+          
+          # 3. Strip legacy kotlinCompilerExtensionVersion blocks that cause compiler mismatches
           find . \( -name "*.gradle" -o -name "*.gradle.kts" \) -type f -exec sed -i '/kotlinCompilerExtensionVersion/d' {} +
 
       - name: Ensure Gradle wrapper executable
