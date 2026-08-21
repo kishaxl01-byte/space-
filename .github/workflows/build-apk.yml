@@ -75,26 +75,13 @@ jobs:
           }
           EOF
 
-      - name: Align Compose Compiler with Kotlin Version
+      - name: Purge Legacy Compose Compiler Dependencies and Flags
         run: |
-          # 1. Dynamically extract Kotlin version from libs.versions.toml or build files
-          KOTLIN_VER=""
-          if [ -f gradle/libs.versions.toml ]; then
-            KOTLIN_VER=$(grep -E '^\s*kotlin\s*=\s*"' gradle/libs.versions.toml | sed -E 's/.*"([^"]+)".*/\1/')
-          fi
-          if [ -z "$KOTLIN_VER" ]; then
-            KOTLIN_VER="2.0.21" # Fallback default
-          fi
-          
-          echo "Detected Kotlin Version: $KOTLIN_VER"
-          
-          # 2. Automatically sync compose-compiler version to match Kotlin version in version catalog
-          if [ -f gradle/libs.versions.toml ]; then
-            sed -i -E "s/(compose-compiler\s*=\s*)\"[^\"]+\"/\\1\"$KOTLIN_VER\"/g" gradle/libs.versions.toml
-            sed -i -E "s/(composeCompiler\s*=\s*)\"[^\"]+\"/\\1\"$KOTLIN_VER\"/g" gradle/libs.versions.toml
-          fi
-          
-          # 3. Strip legacy kotlinCompilerExtensionVersion blocks that cause compiler mismatches
+          # Aggressively remove all legacy compose compiler references, plugins, and dependencies 
+          # that conflict with the Kotlin 2.0+ built-in compose compiler plugin.
+          find . \( -name "*.gradle" -o -name "*.gradle.kts" -o -name "libs.versions.toml" \) -type f -exec sed -i '/androidx\.compose\.compiler/d' {} +
+          find . \( -name "*.gradle" -o -name "*.gradle.kts" -o -name "libs.versions.toml" \) -type f -exec sed -i '/compose-compiler/d' {} +
+          find . \( -name "*.gradle" -o -name "*.gradle.kts" -o -name "libs.versions.toml" \) -type f -exec sed -i '/composeCompiler/d' {} +
           find . \( -name "*.gradle" -o -name "*.gradle.kts" \) -type f -exec sed -i '/kotlinCompilerExtensionVersion/d' {} +
 
       - name: Ensure Gradle wrapper executable
@@ -104,7 +91,7 @@ jobs:
           fi
           chmod +x gradlew
 
-      - name: Configure Gradle Properties (Global Headless & Memory)
+      - name: Configure Gradle Properties (Headless, Memory & KSP Fixes)
         run: |
           mkdir -p ~/.gradle
           echo "org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8 -Djava.awt.headless=true" >> ~/.gradle/gradle.properties
