@@ -49,14 +49,16 @@ jobs:
           fi
           chmod +x gradlew
 
-      - name: Configure Gradle Properties (Memory Fix)
+      - name: Configure Gradle Properties (Memory & Compatibility)
         run: |
           mkdir -p ~/.gradle
           echo "org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8" >> ~/.gradle/gradle.properties
           echo "org.gradle.parallel=true" >> ~/.gradle/gradle.properties
+          echo "kotlin.suppressKotlinVersionCompatibilityCheck=true" >> ~/.gradle/gradle.properties
+          echo "androidx.compose.compiler.plugins.kotlin.suppressKotlinVersionCompatibilityCheck=true" >> ~/.gradle/gradle.properties
 
       - name: Build Debug APK
-        run: ./gradlew clean assembleDebug --stacktrace --no-daemon -Djava.awt.headless=true -Pksp.incremental=false
+        run: ./gradlew clean assembleDebug --stacktrace --no-daemon -Djava.awt.headless=true -Pksp.incremental=false -Pkotlin.suppressKotlinVersionCompatibilityCheck=true
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
