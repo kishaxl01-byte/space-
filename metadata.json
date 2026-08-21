@@ -1,0 +1,7 @@
+{
+  "name": "Cosmos",
+  "description": "An interactive digital book and 3D exploration guide of the planets, solar systems, galaxies, NASA missions, and cosmos with an AI research companion.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
