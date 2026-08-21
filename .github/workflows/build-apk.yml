@@ -5,104 +5,31 @@ on:
     branches: [ "main", "master" ]
   pull_request:
     branches: [ "main", "master" ]
-  workflow_dispatch:
 
 jobs:
   build:
+    name: Build APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
           distribution: 'temurin'
+          java-version: '17'
           cache: 'gradle'
 
-      - name: Prepare environment file
-        run: |
-          if [ -f .env.example ] && [ ! -f .env ]; then
-            cp .env.example .env
-          fi
-
-      - name: Generate missing debug keystore
-        run: |
-          if [ ! -f debug.keystore ]; then
-            keytool -genkeypair -v \
-              -keystore debug.keystore \
-              -storepass android \
-              -alias androiddebugkey \
-              -keypass android \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US"
-          fi
-
-      - name: Generate Mock google-services.json (Dynamic App ID)
-        run: |
-          mkdir -p app
-          
-          # Dynamically extract the actual applicationId from Gradle or Manifest files
-          APP_ID=$(grep -h -o -P 'applicationId\s*=?\s*["'\'']\K[^"'\'']+' app/build.gradle.kts app/build.gradle 2>/dev/null | head -n 1)
-          
-          if [ -z "$APP_ID" ]; then
-            APP_ID=$(grep -h -o -P 'package=["'\'']\K[^"'\'']+' app/src/main/AndroidManifest.xml 2>/dev/null | head -n 1)
-          fi
-          
-          if [ -z "$APP_ID" ]; then
-            echo "Could not find applicationId. Defaulting to com.example.app"
-            APP_ID="com.example.app"
-          else
-            echo "Found matching applicationId: $APP_ID"
-          fi
-          
-          # Create the valid mock JSON using the detected application ID
-          cat <<EOF > app/google-services.json
-          {
-            "project_info": { "project_number": "123456789", "project_id": "dummy-ci-project" },
-            "client": [{
-              "client_info": {
-                "mobilesdk_app_id": "1:123456789:android:abcdef123456",
-                "android_client_info": { "package_name": "$APP_ID" }
-              },
-              "api_key": [{ "current_key": "dummy-api-key" }]
-            }],
-            "configuration_version": "1"
-          }
-          EOF
-
-      - name: Purge Legacy Compose Compiler Dependencies and Flags
-        run: |
-          # Aggressively remove all legacy compose compiler references, plugins, and dependencies 
-          # that conflict with the Kotlin 2.0+ built-in compose compiler plugin.
-          find . \( -name "*.gradle" -o -name "*.gradle.kts" -o -name "libs.versions.toml" \) -type f -exec sed -i '/androidx\.compose\.compiler/d' {} +
-          find . \( -name "*.gradle" -o -name "*.gradle.kts" -o -name "libs.versions.toml" \) -type f -exec sed -i '/compose-compiler/d' {} +
-          find . \( -name "*.gradle" -o -name "*.gradle.kts" -o -name "libs.versions.toml" \) -type f -exec sed -i '/composeCompiler/d' {} +
-          find . \( -name "*.gradle" -o -name "*.gradle.kts" \) -type f -exec sed -i '/kotlinCompilerExtensionVersion/d' {} +
-
-      - name: Ensure Gradle wrapper executable
-        run: |
-          if [ ! -f gradlew ]; then
-            gradle wrapper
-          fi
-          chmod +x gradlew
-
-      - name: Configure Gradle Properties (Headless, Memory & KSP Fixes)
-        run: |
-          mkdir -p ~/.gradle
-          echo "org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8 -Djava.awt.headless=true" >> ~/.gradle/gradle.properties
-          echo "org.gradle.parallel=true" >> ~/.gradle/gradle.properties
-          echo "ksp.incremental=false" >> ~/.gradle/gradle.properties
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
 
       - name: Build Debug APK
-        run: ./gradlew clean assembleDebug --stacktrace --no-daemon
+        run: ./gradlew assembleDebug
 
-      - name: Upload Debug APK
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
+          name: app-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
